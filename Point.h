@@ -6,7 +6,6 @@ class Point
 {
 public:
     Point(float x, float y, float z):x(x), y(y), z(z) {
-
     };
 
     Point() = default;
@@ -15,14 +14,13 @@ public:
 
     Point sub(Point p) {
         Point _p;
-        _p.x = x-p.x;
-        _p.y = y-p.y;
-        _p.z = z - p.z;
+        _p.x = x - p.x;
+        _p.y = y - p.y;
         return _p;
     }
 
     float l2() {
-        return x*x+y*y+z*z;
+        return x*x+y*y;
     }
 
     Point mix(Point& p) {
@@ -40,7 +38,7 @@ public:
         return y;
     }
 
-    Point setNorm() {
+    Point& setNorm() {
         float l = sqrt(l2());
         setMult(1/l);
         return *this;
@@ -50,40 +48,36 @@ public:
         Point _p;
         _p.x = x + p.x;
         _p.y = y + p.y;
-        _p.z = z + p.z;
         return _p;
     }
 
-    Point setRev() {
+    Point& setRev() {
         x = -x;
         y = -y;
-        z = -z;
         return *this;
     }
 
-    Point setAdd(Point p) {
+    Point& setAdd(Point p) {
         x+=p.x;
         y+=p.y;
-        z+=p.z;
         return *this;
     }
 
-    Point setSub(Point p) {
+    Point& setSub(Point p) {
         x-=p.x;
         y-=p.y;
         z-=p.z;
         return *this;
     }
 
-    Point setMult(float _x) {
+    Point& setMult(float _x) {
         x*=_x;
         y*=_x;
-        z*=_x;
         return *this;
     }
 
     float multScal(Point p) {
-        return x*p.x+y*p.y+z*p.z;
+        return x*p.x+y*p.y;
     }
 
     Point mult(Point p) {
@@ -94,7 +88,7 @@ public:
         return p1;
     }
 
-    Point setMult(Point p) {
+    Point& setMult(Point p) {
         Point p1(*this);
         p1.x = y*p.z - z*p.y;
         p1.y = z*p.x - x*p.z;
@@ -107,7 +101,6 @@ public:
         Point _p(*this);
         _p.x*=_x;
         _p.y*=_x;
-        _p.z*=_x;
         return _p;
     }
 
@@ -117,15 +110,16 @@ public:
 };
 
 
-class MatPoint: public Point {
+class MatPoint {
 public:
-    MatPoint(float x, float y, float z):Point(x,y,z) {
+    MatPoint(float x, float y, float z):x(x,y,z) {
     }
 
     void setV(Point& _v) {
         v = _v;
     }
 
+    Point x;
     Point v;
 };
 
