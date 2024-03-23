@@ -16,9 +16,9 @@ class Window: public QMainWindow {
     Q_OBJECT
 public:
     Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent), center(1100, 800) {
-        Point rot(0,0,0.0011);
+        Point rot(0,0,0.00089);
         for(int i=0; i<N; i++) {
-            const int s = 330;
+            const int s = 350;
             float phi = rand()*0.001;
             float r = rand()%1000*0.001;
             MPS.emplace_back(sin(phi)*s*r,cos(phi)*s*r,0);
@@ -36,22 +36,26 @@ protected:
     void paintEvent(QPaintEvent *e) {
         QPainter* painter=new QPainter(this);
 
-        for(int i = 0; i<40; i++) {
+        for(int i = 0; i<15; i++) {
             // speeds
             for(int i=0; i<N; i++)
                 for(int j=i+1; j<N; j++) {
                     // phys
-                    if(pairs.find(make_pair(i,j)) == pairs.end()) {
-                        Point r = MPS[j].x.sub(MPS[i].x);
-                        float rr = r.l2();
-                        if (rr > rigid_dist2) {
-                            Point dir = r.norm();
-                            float krr = 0.0001 / sqrt(rr);
-                            MPS[i].v.setAdd(dir.mult(krr));
-                            MPS[j].v.setAdd(dir.mult(-krr));
-                        } else {
-                            pairs[make_pair(i, j)] = true;
+
+                    Point r = MPS[j].x.sub(MPS[i].x);
+                    float rr = r.l2();
+                    if (rr > rigid_dist2) {
+                        Point dir = r.norm();
+                        float krr = 0.0001 / sqrt(rr);
+                        MPS[i].v.setAdd(dir.mult(krr));
+                        MPS[j].v.setAdd(dir.mult(-krr));
+                        if(rr > rigid_dist2_lim) {
+                            auto el = pairs.find(make_pair(i,j));
+                            if(el != pairs.end())
+                                pairs.erase(el);
                         }
+                    } else {
+                        pairs[make_pair(i, j)] = true;
                     }
                 }
 
@@ -60,14 +64,14 @@ protected:
             for(auto& p: pairs) {
                 int i = p.first.first;
                 int j = p.first.second;
-                auto tmp = MPS[i].v.sub(MPS[j].v);
+                auto tmp = MPS[i].x.sub(MPS[j].x);
                 if(tmp.l2()>0.000000001) {
                     tmp.setNorm();
                     Point V1n = MPS[i].v.getComponent(tmp);
                     Point V2n = MPS[j].v.getComponent(tmp);
 
-                    MPS[i].v.setSub(V1n);
-                    MPS[j].v.setSub(V2n);
+                    MPS[i].v.setSub(V1n.mult(1));
+                    MPS[j].v.setSub(V2n.mult(1));
 
                     Point Vn = V1n.mix(V2n);
                     MPS[i].v.setAdd(Vn);
@@ -85,19 +89,19 @@ protected:
                 int i = p.first.first;
                 int j = p.first.second;
 
-                auto tmp = MPS[i].x.sub(MPS[j].x);
+                // push away
+//                auto tmp = MPS[i].x.sub(MPS[j].x);
+//                if(tmp.l2()<0.000001) continue;
+//
+//                tmp.setNorm().setMult(0.00038);
+//                MPS[i].v.setAdd(tmp);
+//                MPS[j].v.setSub(tmp);
 
-                if(tmp.l2()<0.000001) continue;
-
-                tmp.setNorm().setMult(0.0003);
-                MPS[i].v.setAdd(tmp);
-                MPS[j].v.setSub(tmp);
-
+// rigid
 //                auto mix = MPS[i].x.mix(MPS[j].x);
 //                Point x1 = MPS[i].x.sub(mix);
 //                Point x2 = MPS[j].x.sub(mix);
 //                if (x1.l2() > 0.00001) {
-////                    qDebug()<<"h";
 //                    x1.setNorm().setMult(rigid_dist / 2.);
 //                    MPS[i].x = (mix.add(x1));
 //
@@ -143,8 +147,9 @@ private:
     vector<MatPoint> MPS;
     map<pair<int, int>, bool> pairs;
     QPoint center;
-    const float rigid_dist = 3;
+    const float rigid_dist = 4;
     const float rigid_dist2 = rigid_dist * rigid_dist;
+    const float rigid_dist2_lim =  rigid_dist * rigid_dist * 1.8 * 1.8;
     const int N = 600;
 };
 
