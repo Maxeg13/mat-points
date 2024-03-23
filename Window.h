@@ -16,7 +16,7 @@ class Window: public QMainWindow {
     Q_OBJECT
 public:
     Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent), center(1100, 800) {
-        Point z(0,0,0.0011);
+        Point rot(0,0,0.0011);
         for(int i=0; i<N; i++) {
             const int s = 330;
             float phi = rand()*0.001;
@@ -24,7 +24,7 @@ public:
             MPS.emplace_back(sin(phi)*s*r,cos(phi)*s*r,0);
 
             MPS.back().v = MPS.back().x;
-            MPS.back().v.setMult(z);
+            MPS.back().v.setMult(rot);
         }
 
         QTimer* timer = new QTimer(this);
@@ -81,9 +81,18 @@ protected:
             }
 
 //            // pairs coords
-//            for(auto& p: pairs) {
-//                int i = p.first.first;
-//                int j = p.first.second;
+            for(auto& p: pairs) {
+                int i = p.first.first;
+                int j = p.first.second;
+
+                auto tmp = MPS[i].x.sub(MPS[j].x);
+
+                if(tmp.l2()<0.000001) continue;
+
+                tmp.setNorm().setMult(0.0003);
+                MPS[i].v.setAdd(tmp);
+                MPS[j].v.setSub(tmp);
+
 //                auto mix = MPS[i].x.mix(MPS[j].x);
 //                Point x1 = MPS[i].x.sub(mix);
 //                Point x2 = MPS[j].x.sub(mix);
@@ -95,7 +104,7 @@ protected:
 //                    x2.setNorm().setMult(rigid_dist / 2.);
 //                    MPS[j].x = (mix.add(x2));
 //                }
-//            }
+            }
         }
 
         QPen pen(Qt::black);
