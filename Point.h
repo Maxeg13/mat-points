@@ -8,6 +8,15 @@ public:
     Point(float x, float y, float z):x(x), y(y), z(z) {
     };
 
+    Point(float x, float y):x(x), y(y), z(0) {
+    };
+
+    static Point rnd(float a, float b) {
+        float phi = rand()*0.004;
+        float r = rand()%1000*0.001;
+        return Point(cos(phi)*(a+r*(b-a)), sin(phi)*(a+r*(b-a)));
+    }
+
     Point() = default;
 
     Point(const Point&) = default;
@@ -114,6 +123,8 @@ class MatPoint {
 public:
     MatPoint(float x, float y, float z):x(x,y,z) {
     }
+
+    MatPoint(Point&& p):x(p) {}
 
     void setV(Point& _v) {
         v = _v;

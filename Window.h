@@ -16,12 +16,15 @@ class Window: public QMainWindow {
     Q_OBJECT
 public:
     Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent), center(1100, 800) {
-        Point rot(0,0,0.00089);
+        Point rot(0,0,0.0004);
         for(int i=0; i<N; i++) {
-            const int s = 350;
-            float phi = rand()*0.001;
-            float r = rand()%1000*0.001;
-            MPS.emplace_back(sin(phi)*s*r,cos(phi)*s*r,0);
+
+            if(i<N*0.65)
+                MPS.push_back(Point::rnd(0, 180));
+            else if(i<N*0.82)
+                MPS.push_back(Point::rnd(200, 340));
+            else
+                MPS.push_back(Point::rnd(400, 500));
 
             MPS.back().v = MPS.back().x;
             MPS.back().v.setMult(rot);
@@ -36,7 +39,7 @@ protected:
     void paintEvent(QPaintEvent *e) {
         QPainter* painter=new QPainter(this);
 
-        for(int i = 0; i<15; i++) {
+        for(int i = 0; i<30; i++) {
             // speeds
             for(int i=0; i<N; i++)
                 for(int j=i+1; j<N; j++) {
@@ -90,12 +93,12 @@ protected:
                 int j = p.first.second;
 
                 // push away
-//                auto tmp = MPS[i].x.sub(MPS[j].x);
-//                if(tmp.l2()<0.000001) continue;
-//
-//                tmp.setNorm().setMult(0.00038);
-//                MPS[i].v.setAdd(tmp);
-//                MPS[j].v.setSub(tmp);
+                auto tmp = MPS[i].x.sub(MPS[j].x);
+                if(tmp.l2()<0.000001) continue;
+
+                tmp.setNorm().setMult(0.00024);
+                MPS[i].v.setAdd(tmp);
+                MPS[j].v.setSub(tmp);
 
 // rigid
 //                auto mix = MPS[i].x.mix(MPS[j].x);
@@ -118,25 +121,32 @@ protected:
 
 
         for(auto& mp: MPS)
-            painter->drawPoint(center+QPoint(mp.x.x, mp.x.y));
+            painter->drawPoint(center+QPoint(mp.x.x*scale, mp.x.y*scale));
 
         delete painter;
     }
 public slots:
     void keyPressEvent(QKeyEvent *event) {
+        const int stride = 10;
         switch(event->key())
         {
             case Qt::Key_Right:
-                center.setX(center.x() - 3);
+                center.setX(center.x() - stride);
                 break;
             case Qt::Key_Left:
-                center.setX(center.x() + 3);
+                center.setX(center.x() + stride);
                 break;
             case Qt::Key_Up:
-                center.setY(center.y() + 3);
+                center.setY(center.y() + stride);
                 break;
             case Qt::Key_Down:
-                center.setY(center.y() - 3);
+                center.setY(center.y() - stride);
+                break;
+            case Qt::Key_Z:
+                scale+=0.04;
+                break;
+            case Qt::Key_X:
+                scale-=0.04;
                 break;
         }
     };
@@ -150,7 +160,8 @@ private:
     const float rigid_dist = 4;
     const float rigid_dist2 = rigid_dist * rigid_dist;
     const float rigid_dist2_lim =  rigid_dist * rigid_dist * 1.8 * 1.8;
-    const int N = 600;
+    const int N = 560;
+    float scale = 1;
 };
 
 #endif //PARTICLES_WINDOW_H
