@@ -53,6 +53,13 @@ public:
         return *this;
     }
 
+    Point operator+(const Point& p) {
+        Point _p;
+        _p.x = x + p.x;
+        _p.y = y + p.y;
+        return _p;
+    }
+
     Point add(Point p) {
         Point _p;
         _p.x = x + p.x;
