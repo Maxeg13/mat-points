@@ -15,21 +15,39 @@ using namespace std;
 
 class Window: public QMainWindow {
     Q_OBJECT
+private:
+    vector<MatPoint> MPS;
+    map<pair<int, int>, bool> pairs;
+    QPoint center;
+    const float rigid_dist = 4.2;
+    const float rigid_dist2 = rigid_dist * rigid_dist;
+    const float rigid_dist_lim_k = 1.3;
+    const float rigid_dist2_lim =  rigid_dist * rigid_dist * rigid_dist_lim_k * rigid_dist_lim_k;
+    const int N = 550;
+    float scale = 1;
 public:
-    Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent), center(1100, 800) {
-        Point rot(0,0,0.00036);
-        const float rk = 0.4;
+    Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent),
+//    center(1100, 800)
+    center(700, 450)
+    {
+        Point rot(0,0,0.00041);
+        const float rk = 0.5;
         for(int i=0; i<N; i++) {
 
-//            if(i<N*0.65)
-                MPS.push_back(Point::rnd(0, 650).mult(rk));
-//            else if(i<N*0.82)
-//                MPS.push_back(Point::rnd(200, 380).mult(rk));
-//            else
-//                MPS.push_back(Point::rnd(400, 500).mult(rk));
+            if(i<N*0.67) {
+                MPS.push_back(Point::rnd(0, 170).mult(rk));
+                rot.z = -0.0005;
+            }
+            else if(i<N*0.82) {
+                MPS.push_back(Point::rnd(200, 380).mult(rk));
+                rot.z = 0.0005;
+            }
+            else {
+                MPS.push_back(Point::rnd(430, 500).mult(rk));
+                rot.z = 0.00033;
+            }
 
             MPS.back().v = MPS.back().x ;
-//                    + MPS.back().x.norm().mult(5);
             MPS.back().v.setMult(rot);
         }
 
@@ -40,7 +58,7 @@ public:
     }
 protected:
     void paintEvent(QPaintEvent *e) {
-        QPainter* painter=new QPainter(this);
+        QPainter painter(this);
 
         for(int i = 0; i<30; i++) {
             // speeds
@@ -118,16 +136,13 @@ protected:
         }
 
         QPen pen(Qt::black);
-        pen.setWidth(11);
+        pen.setWidth(6);
         pen.setCapStyle(Qt::PenCapStyle::RoundCap);
-        pen.setColor(QColor(150,0,0, 90));
-        painter->setPen(pen);
-
+        pen.setColor(QColor(0,0,0));
+        painter.setPen(pen);
 
         for(auto& mp: MPS)
-            painter->drawPoint(center+QPoint(mp.x.x*scale, mp.x.y*scale));
-
-        delete painter;
+            painter.drawPoint(center+QPoint(mp.x.x*scale, mp.x.y*scale));
     }
 public slots:
     void keyPressEvent(QKeyEvent *event) {
@@ -157,16 +172,6 @@ public slots:
     void draw() {
         update();
     }
-private:
-    vector<MatPoint> MPS;
-    map<pair<int, int>, bool> pairs;
-    QPoint center;
-    const float rigid_dist = 5;
-    const float rigid_dist2 = rigid_dist * rigid_dist;
-    const float rigid_dist_lim_k = 1.3;
-    const float rigid_dist2_lim =  rigid_dist * rigid_dist * rigid_dist_lim_k * rigid_dist_lim_k;
-    const int N = 580;
-    float scale = 1.4;
 };
 
 #endif //PARTICLES_WINDOW_H
