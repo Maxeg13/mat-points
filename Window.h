@@ -10,41 +10,53 @@
 #include <vector>
 #include <QKeyEvent>
 #include <thread>
+#include <mutex>
 
 using namespace std;
+
+#include <mutex>
+#include <condition_variable>
 
 class Window: public QMainWindow {
     Q_OBJECT
 private:
+    static constexpr int threads_num = 24;
+    static constexpr int N = 2000/threads_num*threads_num;
+
     vector<MatPoint> MPS;
-    map<pair<int, int>, bool> pairs;
+    map<pair<int, int>, bool> pairs[threads_num];
+
     QPoint center;
-    const float rigid_dist = 4.2;
+    static constexpr int thread_step = N / threads_num;
+    std::thread ts[threads_num];
+    int i1[threads_num];
+    std::mutex mtx;
+
+    const float rigid_dist = 3;
     const float rigid_dist2 = rigid_dist * rigid_dist;
     const float rigid_dist_lim_k = 1.3;
     const float rigid_dist2_lim =  rigid_dist * rigid_dist * rigid_dist_lim_k * rigid_dist_lim_k;
-    const int N = 550;
-    float scale = 1;
+    float scale = 0.7;
 public:
     Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent),
 //    center(1100, 800)
-    center(700, 450)
+    center(1100, 450)
     {
-        Point rot(0,0,0.00041);
-        const float rk = 0.5;
+        Point rot(0,0,0.00000);
+        const float rk = 0.6;
         for(int i=0; i<N; i++) {
 
-            if(i<N*0.67) {
+            if(i<N*0.69) {
                 MPS.push_back(Point::rnd(0, 170).mult(rk));
-                rot.z = -0.0005;
+                rot.z = -0.00009;
             }
-            else if(i<N*0.82) {
-                MPS.push_back(Point::rnd(200, 380).mult(rk));
-                rot.z = 0.0005;
+            else if(i<N*0.84) {
+                MPS.push_back(Point::rnd(250, 440).mult(rk));
+                rot.z = 0.0014;
             }
             else {
-                MPS.push_back(Point::rnd(430, 500).mult(rk));
-                rot.z = 0.00033;
+                MPS.push_back(Point::rnd(450, 650).mult(rk));
+                rot.z = 0.00053;
             }
 
             MPS.back().v = MPS.back().x ;
@@ -55,85 +67,102 @@ public:
         connect(timer, SIGNAL(timeout()), this, SLOT(draw()));
         timer->setInterval(40);
         timer->start();
-    }
-protected:
-    void paintEvent(QPaintEvent *e) {
-        QPainter painter(this);
 
-        for(int i = 0; i<30; i++) {
-            // speeds
-            for(int i=0; i<N; i++)
-                for(int j=i+1; j<N; j++) {
+        for(int i = 0; i<threads_num; i++) {
+            i1[i] = i * thread_step;
+        }
+
+        auto lam = [this](int idx){
+            for (int i = i1[idx]; i < i1[idx]+thread_step; i++) {
+                for (int j = i + 1; j < N; j++) {
                     // phys
 
                     Point r = MPS[j].x.sub(MPS[i].x);
                     float rr = r.l2();
                     if (rr > rigid_dist2) {
                         Point dir = r.norm();
-                        float krr = 0.0025 / (rr);
+                        float krr = 0.007 / (rr);
                         MPS[i].v.setAdd(dir.mult(krr));
                         MPS[j].v.setAdd(dir.mult(-krr));
-                        if(rr > rigid_dist2_lim) {
-                            auto el = pairs.find(make_pair(i,j));
-                            if(el != pairs.end())
-                                pairs.erase(el);
+                        if (rr > rigid_dist2_lim) {
+//                            std::unique_lock<std::mutex> lock(mtx);
+                            auto el = pairs[idx].find(make_pair(i, j));
+                            if (el != pairs[idx].end())
+                                pairs[idx].erase(el);
                         }
                     } else {
-                        pairs[make_pair(i, j)] = true;
+//                        std::unique_lock<std::mutex> lock(mtx);
+                        pairs[idx][make_pair(i, j)] = true;
+                    }
+                }
+            }
+
+        };
+
+        std::thread main_thread([this, lam]{
+            while(true)
+            {
+                for (int i = 0; i < threads_num; i++) {
+                    ts[i] = std::move(std::thread(lam, i));
+                }
+
+                for (int i = 0; i < threads_num; i++) {
+                    ts[i].join();
+                }
+
+                // pairs vs
+                for(int idx = 0; idx < threads_num; idx++) {
+                    for (auto &p: pairs[idx]) {
+                        int i = p.first.first;
+                        int j = p.first.second;
+                        auto tmp = MPS[i].x.sub(MPS[j].x);
+                        if (tmp.l2() > 0.000000001) {
+                            tmp.setNorm();
+                            Point V1n = MPS[i].v.getComponent(tmp);
+                            Point V2n = MPS[j].v.getComponent(tmp);
+
+                            static const float k = 0.18;
+                            Point V1a = V1n.mult(k);
+                            Point V2a = V2n.mult(k);
+
+                            MPS[i].v.setAdd(V2a);
+                            MPS[j].v.setAdd(V1a);
+
+                            Point Vn = V1a.mix(V2a);
+                            MPS[i].v.setSub(Vn);
+                            MPS[j].v.setSub(Vn);
+                        }
                     }
                 }
 
+                //            // pairs coords
+                for(int idx = 0; idx < threads_num; idx++) {
+                    for (auto &p: pairs[idx]) {
+                        int i = p.first.first;
+                        int j = p.first.second;
 
-            // pairs vs
-            for(auto& p: pairs) {
-                int i = p.first.first;
-                int j = p.first.second;
-                auto tmp = MPS[i].x.sub(MPS[j].x);
-                if(tmp.l2()>0.000000001) {
-                    tmp.setNorm();
-                    Point V1n = MPS[i].v.getComponent(tmp);
-                    Point V2n = MPS[j].v.getComponent(tmp);
+                        // push away
+                        auto tmp = MPS[i].x.sub(MPS[j].x);
+                        if (tmp.l2() < 0.000001) continue;
 
-                    MPS[i].v.setSub(V1n.mult(1));
-                    MPS[j].v.setSub(V2n.mult(1));
+                        tmp.setNorm().setMult(0.00320);
+                        MPS[i].v.setAdd(tmp);
+                        MPS[j].v.setSub(tmp);
+                    }
+                }
 
-                    Point Vn = V1n.mix(V2n);
-                    MPS[i].v.setAdd(Vn);
-                    MPS[j].v.setAdd(Vn);
+                // coords
+                for (auto &x: MPS) {
+                    x.x.setAdd(x.v);
                 }
             }
+        });
+        main_thread.detach();
 
-            // coords
-            for(auto& x:MPS) {
-                x.x.setAdd(x.v);
-            }
-
-//            // pairs coords
-            for(auto& p: pairs) {
-                int i = p.first.first;
-                int j = p.first.second;
-
-                // push away
-                auto tmp = MPS[i].x.sub(MPS[j].x);
-                if(tmp.l2()<0.000001) continue;
-
-                tmp.setNorm().setMult(0.00028);
-                MPS[i].v.setAdd(tmp);
-                MPS[j].v.setSub(tmp);
-
-// rigid
-//                auto mix = MPS[i].x.mix(MPS[j].x);
-//                Point x1 = MPS[i].x.sub(mix);
-//                Point x2 = MPS[j].x.sub(mix);
-//                if (x1.l2() > 0.00001) {
-//                    x1.setNorm().setMult(rigid_dist / 2.);
-//                    MPS[i].x = (mix.add(x1));
-//
-//                    x2.setNorm().setMult(rigid_dist / 2.);
-//                    MPS[j].x = (mix.add(x2));
-//                }
-            }
-        }
+    }
+protected:
+    void paintEvent(QPaintEvent *e) {
+        QPainter painter(this);
 
         QPen pen(Qt::black);
         pen.setWidth(6);
@@ -162,10 +191,10 @@ public slots:
                 center.setY(center.y() - stride);
                 break;
             case Qt::Key_Z:
-                scale+=0.04;
+                scale*=1.04;
                 break;
             case Qt::Key_X:
-                scale-=0.04;
+                scale*=0.96;
                 break;
         }
     };
