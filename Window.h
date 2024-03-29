@@ -14,6 +14,7 @@
 
 using namespace std;
 
+#include <set>
 #include <mutex>
 #include <condition_variable>
 
@@ -21,10 +22,10 @@ class Window: public QMainWindow {
     Q_OBJECT
 private:
     static constexpr int threads_num = 24;
-    static constexpr int N = 2000/threads_num*threads_num;
+    static constexpr int N = 1200/threads_num*threads_num;
 
     vector<MatPoint> MPS;
-    map<pair<int, int>, bool> pairs[threads_num];
+    set<pair<int, int>> pairs[threads_num];
 
     QPoint center;
     static constexpr int thread_step = N / threads_num;
@@ -32,7 +33,7 @@ private:
     int i1[threads_num];
     std::mutex mtx;
 
-    const float rigid_dist = 3;
+    const float rigid_dist = 2.5;
     const float rigid_dist2 = rigid_dist * rigid_dist;
     const float rigid_dist_lim_k = 1.3;
     const float rigid_dist2_lim =  rigid_dist * rigid_dist * rigid_dist_lim_k * rigid_dist_lim_k;
@@ -77,7 +78,7 @@ public:
                 for (int j = i + 1; j < N; j++) {
                     // phys
 
-                    Point r = MPS[j].x.sub(MPS[i].x);
+                    Point r = MPS[j].x - (MPS[i].x);
                     float rr = r.l2();
                     if (rr > rigid_dist2) {
                         Point dir = r.norm();
@@ -92,7 +93,7 @@ public:
                         }
                     } else {
 //                        std::unique_lock<std::mutex> lock(mtx);
-                        pairs[idx][make_pair(i, j)] = true;
+                        pairs[idx].insert(make_pair(i, j));
                     }
                 }
             }
@@ -113,15 +114,15 @@ public:
                 // pairs vs
                 for(int idx = 0; idx < threads_num; idx++) {
                     for (auto &p: pairs[idx]) {
-                        int i = p.first.first;
-                        int j = p.first.second;
-                        auto tmp = MPS[i].x.sub(MPS[j].x);
+                        int i = p.first;
+                        int j = p.second;
+                        auto tmp = MPS[i].x - MPS[j].x;
                         if (tmp.l2() > 0.000000001) {
                             tmp.setNorm();
                             Point V1n = MPS[i].v.getComponent(tmp);
                             Point V2n = MPS[j].v.getComponent(tmp);
 
-                            static const float k = 0.18;
+                            static const float k = 1;
                             Point V1a = V1n.mult(k);
                             Point V2a = V2n.mult(k);
 
@@ -138,14 +139,14 @@ public:
                 //            // pairs coords
                 for(int idx = 0; idx < threads_num; idx++) {
                     for (auto &p: pairs[idx]) {
-                        int i = p.first.first;
-                        int j = p.first.second;
+                        int i = p.first;
+                        int j = p.second;
 
                         // push away
-                        auto tmp = MPS[i].x.sub(MPS[j].x);
-                        if (tmp.l2() < 0.000001) continue;
+                        auto tmp = MPS[i].x - MPS[j].x;
+                        if (tmp.l2() < 0.0000001) continue;
 
-                        tmp.setNorm().setMult(0.00320);
+                        tmp.setNorm().setMult(0.00340);
                         MPS[i].v.setAdd(tmp);
                         MPS[j].v.setSub(tmp);
                     }
@@ -172,6 +173,18 @@ protected:
 
         for(auto& mp: MPS)
             painter.drawPoint(center+QPoint(mp.x.x*scale, mp.x.y*scale));
+
+        {
+            pen.setWidth(3);
+            QPoint tmp(30, 30);
+            painter.drawLine(tmp, tmp+QPoint(rigid_dist*scale, 0));
+        }
+
+        {
+            pen.setWidth(3);
+            QPoint tmp(30, 36);
+            painter.drawLine(tmp, tmp+QPoint(sqrt(rigid_dist2_lim)*scale, 0));
+        }
     }
 public slots:
     void keyPressEvent(QKeyEvent *event) {

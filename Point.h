@@ -12,7 +12,7 @@ public:
     };
 
     static Point rnd(float a, float b) {
-        float phi = rand()*0.004;
+        float phi = rand()*0.005;
         float r = rand()%1000*0.001;
         return Point(cos(phi)*(a+r*(b-a)), sin(phi)*(a+r*(b-a)));
     }
@@ -21,22 +21,23 @@ public:
 
     Point(const Point&) = default;
 
-    Point sub(Point p) {
-        Point _p;
-        _p.x = x - p.x;
-        _p.y = y - p.y;
-        return _p;
+    friend Point operator+(const Point& p1, const Point& p2) {
+        return {p1.x+p2.x, p1.y+p2.y};
+    }
+
+    friend Point operator-(const Point& p1, const Point& p2) {
+        return {p1.x - p2.x, p1.y - p2.y};
     }
 
     float l2() {
         return x*x+y*y;
     }
 
-    Point mix(Point& p) {
-        return add(p).mult(0.5);
+    Point mix(const Point& p) {
+        return ((*this) + p).mult(0.5);
     }
 
-    Point getComponent(Point& n) {
+    Point getComponent(const Point& n) {
         return n.mult(multScal(n));
     }
 
@@ -53,33 +54,19 @@ public:
         return *this;
     }
 
-    Point operator+(const Point& p) {
-        Point _p;
-        _p.x = x + p.x;
-        _p.y = y + p.y;
-        return _p;
-    }
-
-    Point add(Point p) {
-        Point _p;
-        _p.x = x + p.x;
-        _p.y = y + p.y;
-        return _p;
-    }
-
     Point& setRev() {
         x = -x;
         y = -y;
         return *this;
     }
 
-    Point& setAdd(Point p) {
+    Point& setAdd(const Point& p) {
         x+=p.x;
         y+=p.y;
         return *this;
     }
 
-    Point& setSub(Point p) {
+    Point& setSub(const Point& p) {
         x-=p.x;
         y-=p.y;
         z-=p.z;
@@ -92,20 +79,16 @@ public:
         return *this;
     }
 
-    float multScal(Point p) {
+    float multScal(const Point& p) {
         return x*p.x+y*p.y;
     }
 
-    Point mult(Point p) {
-        Point p1(*this);
-        p1.x = y*p.z - z*p.y;
-        p1.y = z*p.x - x*p.z;
-        p1.z = x*p.y - y*p.x;
-        return p1;
+    Point mult(const Point& p) {
+        return {y*p.z - z*p.y, z*p.x - x*p.z, x*p.y - y*p.x};
     }
 
-    Point& setMult(Point p) {
-        Point p1(*this);
+    Point& setMult(const Point& p) {
+        Point p1;
         p1.x = y*p.z - z*p.y;
         p1.y = z*p.x - x*p.z;
         p1.z = x*p.y - y*p.x;
@@ -113,7 +96,7 @@ public:
         return *this;
     }
 
-    Point mult(float _x) {
+    Point mult(float _x) const {
         Point _p(*this);
         _p.x*=_x;
         _p.y*=_x;
