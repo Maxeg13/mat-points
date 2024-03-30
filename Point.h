@@ -116,7 +116,7 @@ public:
 
     MatPoint(Point&& p):x(p) {}
 
-    void setV(Point& _v) {
+    void setV(Point&& _v) {
         v = _v;
     }
 

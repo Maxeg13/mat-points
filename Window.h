@@ -21,43 +21,47 @@ using namespace std;
 class Window: public QMainWindow {
     Q_OBJECT
 private:
-    static constexpr int threads_num = 24;
-    static constexpr int N = 1200/threads_num*threads_num;
+    static constexpr int threads_num = 20;
+    static constexpr int N = 2510/threads_num*threads_num;
 
     vector<MatPoint> MPS;
-    set<pair<int, int>> pairs[threads_num];
+    set<pair<::uint16_t , ::uint16_t>> pairs[threads_num];
 
+    bool pause = 0;
+    QPoint center0;
     QPoint center;
     static constexpr int thread_step = N / threads_num;
     std::thread ts[threads_num];
     int i1[threads_num];
     std::mutex mtx;
 
-    const float rigid_dist = 2.5;
+    const float rigid_dist = 3.3;
     const float rigid_dist2 = rigid_dist * rigid_dist;
     const float rigid_dist_lim_k = 1.3;
     const float rigid_dist2_lim =  rigid_dist * rigid_dist * rigid_dist_lim_k * rigid_dist_lim_k;
     float scale = 0.7;
+    float scale_k = 1.06;
 public:
     Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent),
-//    center(1100, 800)
-    center(1100, 450)
+    center(600, 450)
+//    center(1100, 650)
     {
+        center0 = QPoint(center);
         Point rot(0,0,0.00000);
-        const float rk = 0.6;
+        const float rk = 0.58;
         for(int i=0; i<N; i++) {
 
-            if(i<N*0.69) {
-                MPS.push_back(Point::rnd(0, 170).mult(rk));
-                rot.z = -0.00009;
-            }
-            else if(i<N*0.84) {
-                MPS.push_back(Point::rnd(250, 440).mult(rk));
+            if(i<N*0.5) {
+                MPS.push_back(Point::rnd(10, 150).mult(rk));
                 rot.z = 0.0014;
+            }
+            else if(i<N*1) {
+                MPS.push_back(Point::rnd(150, 250).mult(rk));
+                rot.z = 0.0013;
             }
             else {
                 MPS.push_back(Point::rnd(450, 650).mult(rk));
-                rot.z = 0.00053;
+                rot.z = 0.00035;
             }
 
             MPS.back().v = MPS.back().x ;
@@ -81,13 +85,15 @@ public:
                     Point r = MPS[j].x - (MPS[i].x);
                     float rr = r.l2();
                     if (rr > rigid_dist2) {
-                        Point dir = r.norm();
-                        float krr = 0.007 / (rr);
-                        MPS[i].v.setAdd(dir.mult(krr));
-                        MPS[j].v.setAdd(dir.mult(-krr));
+                        auto el = pairs[idx].find(make_pair(i, j));
+                        if (el == pairs[idx].end()) {
+                            Point dir = r.norm();
+                            float krr = 0.007 / (rr);
+                            MPS[i].v.setAdd(dir.mult(krr));
+                            MPS[j].v.setAdd(dir.mult(-krr));
+                        }
                         if (rr > rigid_dist2_lim) {
 //                            std::unique_lock<std::mutex> lock(mtx);
-                            auto el = pairs[idx].find(make_pair(i, j));
                             if (el != pairs[idx].end())
                                 pairs[idx].erase(el);
                         }
@@ -103,6 +109,8 @@ public:
         std::thread main_thread([this, lam]{
             while(true)
             {
+                if(pause) continue;
+
                 for (int i = 0; i < threads_num; i++) {
                     ts[i] = std::move(std::thread(lam, i));
                 }
@@ -112,17 +120,18 @@ public:
                 }
 
                 // pairs vs
+//                qDebug()<<pairs->size();
                 for(int idx = 0; idx < threads_num; idx++) {
                     for (auto &p: pairs[idx]) {
                         int i = p.first;
                         int j = p.second;
                         auto tmp = MPS[i].x - MPS[j].x;
-                        if (tmp.l2() > 0.000000001) {
+                        if (tmp.l2() > 0.0000001) {
                             tmp.setNorm();
                             Point V1n = MPS[i].v.getComponent(tmp);
                             Point V2n = MPS[j].v.getComponent(tmp);
 
-                            static const float k = 1;
+                            static const float k = 0.034;
                             Point V1a = V1n.mult(k);
                             Point V2a = V2n.mult(k);
 
@@ -146,7 +155,7 @@ public:
                         auto tmp = MPS[i].x - MPS[j].x;
                         if (tmp.l2() < 0.0000001) continue;
 
-                        tmp.setNorm().setMult(0.00340);
+                        tmp.setNorm().setMult(0.0021);
                         MPS[i].v.setAdd(tmp);
                         MPS[j].v.setSub(tmp);
                     }
@@ -162,6 +171,10 @@ public:
 
     }
 protected:
+    void changeCenter(float k) {
+        center+=((center0-center)*(1 - k));
+    }
+
     void paintEvent(QPaintEvent *e) {
         QPainter painter(this);
 
@@ -204,10 +217,16 @@ public slots:
                 center.setY(center.y() - stride);
                 break;
             case Qt::Key_Z:
-                scale*=1.04;
+                scale*=scale_k;
+                changeCenter(scale_k);
                 break;
             case Qt::Key_X:
-                scale*=0.96;
+                scale*=(2 - scale_k);
+                changeCenter(2 - scale_k);
+                break;
+            case Qt::Key_P: {
+                pause = !pause;
+            }
                 break;
         }
     };
