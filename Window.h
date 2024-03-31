@@ -14,6 +14,8 @@
 
 using namespace std;
 
+#include <QLabel>
+#include <QVBoxLayout>
 #include <set>
 #include <mutex>
 #include <condition_variable>
@@ -21,9 +23,10 @@ using namespace std;
 class Window: public QMainWindow {
     Q_OBJECT
 private:
-    static constexpr int threads_num = 20;
-    static constexpr int N = 2510/threads_num*threads_num;
+    static constexpr int threads_num = 24;
+    static constexpr int N = 3700/threads_num*threads_num;
 
+    vector<Point> _PS;
     vector<MatPoint> MPS;
     set<pair<::uint16_t , ::uint16_t>> pairs[threads_num];
 
@@ -34,34 +37,43 @@ private:
     std::thread ts[threads_num];
     int i1[threads_num];
     std::mutex mtx;
+    QPixmap img;
+    QLabel* label;
 
-    const float rigid_dist = 3.3;
+    const float rigid_dist = 2.2;
     const float rigid_dist2 = rigid_dist * rigid_dist;
-    const float rigid_dist_lim_k = 1.3;
+    const float rigid_dist_lim_k = 1.27;
     const float rigid_dist2_lim =  rigid_dist * rigid_dist * rigid_dist_lim_k * rigid_dist_lim_k;
-    float scale = 0.7;
+    float scale = 1.3;
     float scale_k = 1.06;
 public:
     Window(QWidget *parent = 0, const char *name = 0):QMainWindow(parent),
-    center(600, 450)
+    center(600, 450), img(2000, 2000), label(new QLabel)
 //    center(1100, 650)
     {
+//        img.fill(QColor(255, 255, 255));
+//        label->setPixmap(img);
+//        setCentralWidget(label);
+
+        for(int i=0; i<N; i++)
+            _PS.push_back({});
+
         center0 = QPoint(center);
         Point rot(0,0,0.00000);
-        const float rk = 0.58;
+        const float rk = 0.85;
         for(int i=0; i<N; i++) {
 
-            if(i<N*0.5) {
-                MPS.push_back(Point::rnd(10, 150).mult(rk));
-                rot.z = 0.0014;
+            if(i<N*0.63) {
+                MPS.push_back(Point::rnd(4, 150).mult(rk));
+                rot.z = 0.0013*5;
             }
             else if(i<N*1) {
                 MPS.push_back(Point::rnd(150, 250).mult(rk));
-                rot.z = 0.0013;
+                rot.z = 0.0012*9;
             }
             else {
-                MPS.push_back(Point::rnd(450, 650).mult(rk));
-                rot.z = 0.00035;
+                MPS.push_back(Point::rnd(250, 300).mult(rk));
+                rot.z = 0.00035*4;
             }
 
             MPS.back().v = MPS.back().x ;
@@ -82,17 +94,16 @@ public:
                 for (int j = i + 1; j < N; j++) {
                     // phys
 
-                    Point r = MPS[j].x - (MPS[i].x);
-                    float rr = r.l2();
-                    if (rr > rigid_dist2) {
+                    Point r = MPS[j].x - MPS[i].x;
+                    float l = sqrt(r.l2());
+                    if (l > rigid_dist) {
                         auto el = pairs[idx].find(make_pair(i, j));
                         if (el == pairs[idx].end()) {
-                            Point dir = r.norm();
-                            float krr = 0.007 / (rr);
-                            MPS[i].v.setAdd(dir.mult(krr));
-                            MPS[j].v.setAdd(dir.mult(-krr));
+                            float krrr = 0.008 * pow(l, -2.17);
+                            MPS[i].v.setAdd(r.mult(krrr));
+                            MPS[j].v.setAdd(r.mult(-krrr));
                         }
-                        if (rr > rigid_dist2_lim) {
+                        if (l > (rigid_dist_lim_k*rigid_dist)) {
 //                            std::unique_lock<std::mutex> lock(mtx);
                             if (el != pairs[idx].end())
                                 pairs[idx].erase(el);
@@ -131,7 +142,7 @@ public:
                             Point V1n = MPS[i].v.getComponent(tmp);
                             Point V2n = MPS[j].v.getComponent(tmp);
 
-                            static const float k = 0.034;
+                            static const float k = 0.015;
                             Point V1a = V1n.mult(k);
                             Point V2a = V2n.mult(k);
 
@@ -155,7 +166,7 @@ public:
                         auto tmp = MPS[i].x - MPS[j].x;
                         if (tmp.l2() < 0.0000001) continue;
 
-                        tmp.setNorm().setMult(0.0021);
+                        tmp.setNorm().setMult(0.0013);
                         MPS[i].v.setAdd(tmp);
                         MPS[j].v.setSub(tmp);
                     }
@@ -177,9 +188,13 @@ protected:
 
     void paintEvent(QPaintEvent *e) {
         QPainter painter(this);
+//
+//        QRect rect(QPoint(0,0), QPoint(2000, 2000));
+//        QBrush brush(QColor(255, 255, 255, 80));
+//        painter.fillRect(rect, brush);
 
         QPen pen(Qt::black);
-        pen.setWidth(6);
+        pen.setWidth(5);
         pen.setCapStyle(Qt::PenCapStyle::RoundCap);
         pen.setColor(QColor(0,0,0));
         painter.setPen(pen);
@@ -198,6 +213,8 @@ protected:
             QPoint tmp(30, 36);
             painter.drawLine(tmp, tmp+QPoint(sqrt(rigid_dist2_lim)*scale, 0));
         }
+//        label->setPixmap(img);
+//        setCentralWidget(label);
     }
 public slots:
     void keyPressEvent(QKeyEvent *event) {

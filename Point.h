@@ -12,14 +12,16 @@ public:
     };
 
     static Point rnd(float a, float b) {
-        float phi = rand()*0.005;
         float r = rand()%1000*0.001;
+        float phi = rand()*0.00668;
         return Point(cos(phi)*(a+r*(b-a)), sin(phi)*(a+r*(b-a)));
     }
 
     Point() = default;
 
     Point(const Point&) = default;
+
+    Point& operator=(const Point& p) = default;
 
     friend Point operator+(const Point& p1, const Point& p2) {
         return {p1.x+p2.x, p1.y+p2.y};
